@@ -41,21 +41,74 @@ def get_farthest_points(points: list):
     return [(min_x, min_y), (max_x, max_y)]
 
 
-class Square(arcade.Sprite):
-    def __init__(self, color: arcade.color, lives: int, chance_to_affect: float):
+class Square(arcade.SpriteSolidColor):
+    def __init__(self, lives: int = None, max_lives: int = None, min_lives: int = None, *args, **kwargs):
         """Square has a certain number lives, when a square runs out of lives it becomes active and reduces other
         square's lives."""
-        super().__init__()
-        self.color = color
-        self.lives = lives
-        self.chance_to_affect = chance_to_affect
+        super().__init__(*args, **kwargs)
 
-    def active(self):
+        self.lives: int
+        self.set_lives(lives, max_lives, min_lives)
+
+    def active(self) -> bool:
+        """returns whether or not the square has lives."""
+        return not bool(self.lives)
+
+    def passive(self):
         """returns whether or not the square has lives."""
         return bool(self.lives)
 
+    def reduce_lives(self, amount: int = 1) -> None:
+        """reduces lives from the square."""
+        if self.passive():
+            self.lives -= amount
 
-class Squares(arcade.Window):
+    def reduce_life(self):
+        """reduces a life from the square."""
+        self.reduce_lives(1)
+
+    def set_lives(self, exact_amount: int = None, max_lives: int = None, min_lives: int = None) -> None:
+        """sets a random amount of lives based on the given range, or an exact amount."""
+        if exact_amount is None:
+            self.lives = random.randint(min_lives, max_lives)
+        else:
+            self.lives = exact_amount
+
+
+class Grid:
+    def __init__(self, width: int, height: int, sq: Square, infection_range: int):
+        """A grid of squares, using the "Square" class. The grid will start filled with copies of "sq"."""
+        self.width = width
+        self.height = height
+        self.fill_sq = sq
+        self.inf_r = infection_range
+
+        self.grid_list = []
+        for _ in range(self.width):
+            self.grid_list += [[sq for _ in range(self.height)]]
+
+    def update(self) -> None:
+        """updates all the squares in the grid"""
+        for x in range(self.width):
+            for y in range(self.height):
+                curr = self.grid_list[x][y]
+                if curr.active():
+                    self.reduce_around(x, y)
+
+    def reduce_around(self, x: int, y: int) -> None:
+        """reduces one life in a range around the given position."""
+        min_x, min_y = x - self.inf_r, y - self.inf_r
+        max_x, max_y = x + self.inf_r, y + self.inf_r
+
+        max_x -= self.width if max_x >= self.width else 0
+        max_y -= self.height if max_y >= self.height else 0
+
+        for x in range(min_x, max_x):
+            for y in range(min_y, max_y):
+                self.grid_list[x][y].reduce_lives()
+
+
+class Saver(arcade.Window):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -69,7 +122,7 @@ class Squares(arcade.Window):
         """setting key attributes"""
         self.view_corners = get_farthest_points(self.corners)
         self.screen_color = arcade.color.DARK_ELECTRIC_BLUE
-        self.ups = 60  # Updates Per Second (basically useless above 60)
+        self.ups = 20  # Updates Per Second (basically useless above 60)
         self.set_update_rate(1 / self.ups)
 
         for i in range(len(self.corners)):  # making it so I can connect each of the neighboring dots to make a square
@@ -113,5 +166,5 @@ class Squares(arcade.Window):
 
 if __name__ == "__main__":
     screensaver_framework._get_preferred_screen = comb_screens
-    screensaver_framework.create_screensaver_window(Squares)
+    screensaver_framework.create_screensaver_window(Saver)
     arcade.run()
