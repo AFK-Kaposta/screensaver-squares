@@ -153,7 +153,7 @@ class Saver(arcade.Window):
                 self.line_list += [(self.corners[i], self.corners[i + 3])] + \
                                   [(self.corners[i + 1], self.corners[i + 2])]
         line_combs = itertools.combinations(self.line_list, 2)
-        self.borders = arcade.SpriteList(is_static=True, use_spatial_hash=True)
+        # self.borders = arcade.SpriteList(is_static=True, use_spatial_hash=True)
         for line1, line2 in line_combs:
             if line1[0][0] == line1[1][0] == line2[0][0] == line2[1][0]:
                 out = sorted(line1 + line2, key=lambda x: x[1])
@@ -165,60 +165,49 @@ class Saver(arcade.Window):
                 self.line_list.remove(line1)
                 self.line_list.remove(line2)
                 self.line_list += ((out[0], out[1]), (out[2], out[3]))
-        for line in self.line_list:
-            border = arcade.SpriteSolidColor(width=abs(line[0][0] - line[1][0]) + 2,
-                                             height=abs(line[0][1] - line[1][1]) + 2,
-                                             color=arcade.color.PINK)
-            border.bottom = min(line[0][1], line[1][1])
-            border.left = min(line[0][0], line[1][0])
-            self.borders.append(border)
-        self.borders.move(-1, -1)
+        # for line in self.line_list:
+        #     border = arcade.SpriteSolidColor(width=abs(line[0][0] - line[1][0]) + 2,
+        #                                      height=abs(line[0][1] - line[1][1]) + 2,
+        #                                      color=arcade.color.PINK)
+        #     border.bottom = min(line[0][1], line[1][1])
+        #     border.left = min(line[0][0], line[1][0])
+        #     self.borders.append(border)
+        # self.borders.move(-1, -1)
 
-        self.corners_sorted = self.sort_corners(self.corners)
+        self.corners_sorted = self.convert_to_hit_box(self.line_list)
         center_x = int((self.view_corners[0][0] + self.view_corners[1][0]) / 2)
         center_y = int((self.view_corners[0][1] + self.view_corners[1][1]) / 2)
         self.screens_sprite = SpriteScreens(corners=self.corners_sorted, center_x=center_x, center_y=center_y)
 
-    def sort_corners(self, corners) -> list:
+    def convert_to_hit_box(self, lines) -> list:
         """gets a list of corners and sorts them such as if each neighbour is connected, the shape of all the
         screens combined would be drawn."""
 
-        def is_sorted(l):
-            """checks if the list is sorted as intended"""
-            for i in range(len(l)):
-                if not (l[i][0] == l[(i + 1) % len(l)][0] or l[i][1] == l[(i + 1) % len(l)][1]):
-                    return False  # checks if the points are on different x or y axis
-            return True
-
-        def locate(l, point):
+        def locate(list_of_lines, line):
             """locates the first occurrence on n in a list of points"""
-            for i in range(len(l)):
-                if l[i][0] == point[0] or l[i][1] == point[1]:
-                    return i
-            return None
+            for i in range(len(list_of_lines)):
+                if list_of_lines[i][0] == line[1]:
+                    return i, False
+                elif list_of_lines[i][1] == line[1]:
+                    return i, True
+            return None, None
 
-        # def sorter(l):
-        #     """goes through the list recursively until it's sorted"""
-        #     if len(l) is 1:
-        #         return []
-        #     elif l[0][0] == l[1][0] or l[0][1] == l[1][1]:
-        #         return [l[0]] + sorter(l[1:])
-        #     else:
-        #         return sorter(l[1:] + [l[0]])
-        #
-        # return sorter(corners)
-
-        index = 0
-        new = [corners[0]]
-        del corners[0]
-        while len(corners) > 0:
-            index = locate(corners, new[-1])
+        new = [lines[0]]
+        del lines[0]
+        while len(lines) > 0:
+            index, reverse = locate(lines, new[-1])
+            if reverse:
+                lines[index] = (lines[index][1], lines[index][0])
             if index is None:
                 new = new[1:] + [new[0]]
             else:
-                new.append(corners[index])
-                del corners[index]
-        return new
+                new.append(lines[index])
+                del lines[index]
+
+        out = []
+        for point1, point2 in new:
+            out += [point1, point2]
+        return out
 
     def on_update(self, delta_time):
         pass
