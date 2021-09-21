@@ -47,23 +47,23 @@ class Square(arcade.SpriteSolidColor):
         square's lives."""
         super().__init__(*args, **kwargs)
 
-        self.lives: int
+        self.lives = None
         self.set_lives(lives, max_lives, min_lives)
 
-    def active(self) -> bool:
+    def is_active(self) -> bool:
         """returns whether or not the square has lives."""
         return not bool(self.lives)
 
-    def passive(self):
+    def is_passive(self):
         """returns whether or not the square has lives."""
         return bool(self.lives)
 
     def reduce_lives(self, amount: int = 1) -> None:
         """reduces lives from the square."""
-        if self.passive():
+        if self.is_passive():
             self.lives -= amount
 
-    def reduce_life(self):
+    def reduce_life(self) -> None:
         """reduces a life from the square."""
         self.reduce_lives(1)
 
@@ -81,7 +81,7 @@ class Grid:
         self.width = width
         self.height = height
         self.fill_sq = sq
-        self.inf_r = infection_range
+        self.infection_range = infection_range
 
         self.grid_list = []
         for _ in range(self.width):
@@ -92,20 +92,37 @@ class Grid:
         for x in range(self.width):
             for y in range(self.height):
                 curr = self.grid_list[x][y]
-                if curr.active():
+                if curr.is_active():
                     self.reduce_around(x, y)
 
     def reduce_around(self, x: int, y: int) -> None:
         """reduces one life in a range around the given position."""
-        min_x, min_y = x - self.inf_r, y - self.inf_r
-        max_x, max_y = x + self.inf_r, y + self.inf_r
+        min_x, min_y = x - self.infection_range, y - self.infection_range
+        max_x, max_y = x + self.infection_range, y + self.infection_range
 
-        max_x -= self.width if max_x >= self.width else 0
-        max_y -= self.height if max_y >= self.height else 0
+        max_x %= self.width  # making sure the index won't be out of bounds
+        max_y %= self.height
 
         for x in range(min_x, max_x):
             for y in range(min_y, max_y):
                 self.grid_list[x][y].reduce_lives()
+
+
+class SpriteScreens(arcade.Sprite):
+    def __init__(self, corners: list, center_x: int, center_y: int, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.corners = corners
+        self.center_x = center_x
+        self.center_y = center_y
+
+        self.relative_hit_box = []
+        for point in self.corners:
+            self.relative_hit_box += [[point[0] - center_x, point[1] - center_y]]
+
+        self.set_hit_box(self.relative_hit_box)
+
+    def draw(self):
+        self.draw_hit_box(color=arcade.color.PINK, line_thickness=5)
 
 
 class Saver(arcade.Window):
@@ -125,7 +142,8 @@ class Saver(arcade.Window):
         self.ups = 20  # Updates Per Second (basically useless above 60)
         self.set_update_rate(1 / self.ups)
 
-        for i in range(len(self.corners)):  # making it so I can connect each of the neighboring dots to make a square
+        for i in range(len(self.corners)):  # making it so I can connect each of the neighboring dots to make a
+            # rectangle
             if i % 4 == 2:
                 self.corners[i], self.corners[i + 1] = self.corners[i + 1], self.corners[i]
         self.line_list = []  # the borders of the screen
@@ -156,12 +174,59 @@ class Saver(arcade.Window):
             self.borders.append(border)
         self.borders.move(-1, -1)
 
+        self.corners_sorted = self.sort_corners(self.corners)
+        center_x = int((self.view_corners[0][0] + self.view_corners[1][0]) / 2)
+        center_y = int((self.view_corners[0][1] + self.view_corners[1][1]) / 2)
+        self.screens_sprite = SpriteScreens(corners=self.corners_sorted, center_x=center_x, center_y=center_y)
+
+    def sort_corners(self, corners) -> list:
+        """gets a list of corners and sorts them such as if each neighbour is connected, the shape of all the
+        screens combined would be drawn."""
+
+        def is_sorted(l):
+            """checks if the list is sorted as intended"""
+            for i in range(len(l)):
+                if not (l[i][0] == l[(i + 1) % len(l)][0] or l[i][1] == l[(i + 1) % len(l)][1]):
+                    return False  # checks if the points are on different x or y axis
+            return True
+
+        def locate(l, point):
+            """locates the first occurrence on n in a list of points"""
+            for i in range(len(l)):
+                if l[i][0] == point[0] or l[i][1] == point[1]:
+                    return i
+            return None
+
+        # def sorter(l):
+        #     """goes through the list recursively until it's sorted"""
+        #     if len(l) is 1:
+        #         return []
+        #     elif l[0][0] == l[1][0] or l[0][1] == l[1][1]:
+        #         return [l[0]] + sorter(l[1:])
+        #     else:
+        #         return sorter(l[1:] + [l[0]])
+        #
+        # return sorter(corners)
+
+        index = 0
+        new = [corners[0]]
+        del corners[0]
+        while len(corners) > 0:
+            index = locate(corners, new[-1])
+            if index is None:
+                new = new[1:] + [new[0]]
+            else:
+                new.append(corners[index])
+                del corners[index]
+        return new
+
     def on_update(self, delta_time):
         pass
 
     def on_draw(self):
         arcade.start_render()
-        self.borders.draw()
+        self.screens_sprite.draw()
+        # self.borders.draw()
 
 
 if __name__ == "__main__":
