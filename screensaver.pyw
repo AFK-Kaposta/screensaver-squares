@@ -4,6 +4,7 @@ import pyglet
 import random
 import math
 import itertools
+import copy
 
 
 def get_corners(screens):
@@ -45,31 +46,41 @@ class Square(arcade.SpriteSolidColor):
     def __init__(self,
                  center_x: int,
                  center_y: int,
-                 width: int,
-                 color: arcade.Color = arcade.color.WHITE,
-                 next_color: arcade.Color = arcade.color.DARK_CYAN,
+                 size: int,
+                 index: int = None,
+                 color: arcade.Color = arcade.color.DARK_RED,
+                 next_color: arcade.Color = arcade.color.GREEN,
                  lives: int = None,
                  max_lives: int = None,
-                 min_lives: int = None):
+                 min_lives: int = None,
+                 visible: bool = False):
         """Square has a certain number lives, when a square runs out of lives it becomes active and reduces other
         square's lives."""
-        super().__init__(width=width, height=width, color=color)
+        super().__init__(width=size, height=size, color=color)
 
+        self._hit_box_algorithm = 'None'
+        self.visible = visible
+        self.index = index
+        self.size = size
         self.center_x = center_x
         self.center_y = center_y
         self.next_color = next_color
-        self.lives = None
-        self.set_lives(lives, max_lives, min_lives)
+        self.lives = lives
+        self.max_lives = max_lives
+        self.min_lives = min_lives
         self.active = False
 
     def reduce_lives(self, amount: int = 1) -> None:
         """reduces lives from the square."""
         if not self.active:
             self.lives -= amount
-            if self.lives < 1:
-                self.active = True
-                self.color = self.next_color
-                self.next_color = None
+            print(f'reduced at index {self.index}, position ({self.center_x}, {self.center_y})')
+
+    def make_active(self):
+        self.active = True
+        # self._set_color(self.next_color)
+        self.color = self.next_color
+        self.next_color = None
 
     def reduce_life(self) -> None:
         """reduces a life from the square."""
@@ -82,6 +93,14 @@ class Square(arcade.SpriteSolidColor):
         else:
             self.lives = exact_amount
 
+    def randomize_lives(self):
+        """sets the lives to a random integer based on the minimum and maximum lives."""
+        self.set_lives(max_lives=self.max_lives, min_lives=self.min_lives)
+
+    def update(self):
+        if not self.active and self.lives < 1:
+            self.make_active()
+
 
 class Grid:
     def __init__(self, width: int, height: int, sq: Square, infection_range: int):
@@ -91,33 +110,50 @@ class Grid:
         self.fill_sq = sq
         self.infection_range = infection_range
 
-        self.grid_list = []
-        for _ in range(self.width):
-            self.grid_list += [[sq for _ in range(self.height)]]
+        self.grid_list = arcade.SpriteList()  # use_spatial_hash=False, is_static=True)
+        for col in range(self.width):
+            for row in range(self.height):
+                clone = copy.copy(sq)
+                clone.index = self.height * col + row
+                clone.set_position(clone.size * (row + 0.5), clone.size * (col + 0.5))
+                print(f'set {col},{row}')
+                clone.randomize_lives()
+                self.grid_list.append(clone)
 
     def update(self) -> None:
         """updates all the squares in the grid"""
-        for x in range(self.width):
-            for y in range(self.height):
-                if self.grid_list[x][y].active:
-                    self.reduce_around(x, y)
+        for col in range(self.width):
+            for row in range(self.height):
+                if self.grid_list[self.height * col + row].active:
+                    self.reduce_around(col, row)
+                else:
+                    self.grid_list[self.height * col + row].update()
 
-    def reduce_around(self, x: int, y: int) -> None:
+    def reduce_around(self, col: int, row: int) -> None:
         """reduces one life in a range around the given position."""
-        min_x, min_y = x - self.infection_range, y - self.infection_range
-        max_x, max_y = x + self.infection_range, y + self.infection_range
+        min_x, min_y = row - self.infection_range, col - self.infection_range
+        max_x, max_y = row + self.infection_range, col + self.infection_range
 
         max_x %= self.width  # making sure the index won't be out of bounds
         max_y %= self.height
 
+        print(f'min: {min_x},{min_y}, max: {max_x},{max_y}')
         for x in range(min_x, max_x):
             for y in range(min_y, max_y):
-                self.grid_list[x][y].reduce_lives()
+                # print(f'row {row}, col {col}')
+                self.grid_list[self.height * x + y].reduce_lives()
 
     def draw(self):
-        for col in self.grid_list:
-            for sq in col:
-                sq.draw()
+        self.grid_list.draw()
+
+    def set_visibility(self, screens_list: arcade.SpriteList) -> None:
+        """goes through all the sprites and checks if they will be visible on the given screens list.
+        if a sprite won't be visible on the screen his 'visible' attribute will be set to False."""
+        visible_sprites = []
+        for screen in screens_list:
+            visible_sprites += arcade.check_for_collision_with_list(screen, self.grid_list)
+        for sq in visible_sprites:
+            sq.visibility = True
 
 
 class Saver(arcade.Window):
@@ -130,17 +166,25 @@ class Saver(arcade.Window):
         x_diff, y_diff = diff[0][0], diff[1][1]  # the most bottom left corner (where the arcade 0,0 is)
         for i in range(len(self.corners)):
             self.corners[i] = (self.corners[i][0] - x_diff, -self.corners[i][1] + y_diff)
-        self.corners2 = self.corners.copy()
 
         # setting key attributes
         self.view_corners = get_farthest_points(self.corners)
+        self.view_width = self.view_corners[1][0]
+        self.view_height = self.view_corners[1][1]
         self.screen_color = arcade.color.DARK_ELECTRIC_BLUE
-        self.ups = 20  # Updates Per Second (basically useless above 60)
+        self.ups = 3  # Updates Per Second (basically useless above 60)
         self.set_update_rate(1 / self.ups)
-
+        self.square_size = 50  # square width and height in pixels.
+        self.square_count_x = math.ceil(self.view_width / self.square_size)
+        self.square_count_y = math.ceil(self.view_height / self.square_size)
+        self.base_square = Square(center_x=0, center_y=0, size=self.square_size, max_lives=12, min_lives=4)
+        self.grid = Grid(width=self.square_count_x,
+                         height=self.square_count_y,
+                         infection_range=2,
+                         sq=self.base_square)
         self.screens_sprites = arcade.SpriteList(use_spatial_hash=False, is_static=True)
-        for i in range(0, len(self.corners2), 4):
-            a, b, c, d = self.corners2[i], self.corners2[i + 1], self.corners2[i + 2], self.corners2[i + 3]
+        for i in range(0, len(self.corners), 4):
+            a, b, c, d = self.corners[i], self.corners[i + 1], self.corners[i + 2], self.corners[i + 3]
             if a[0] != b[0] and a[1] != b[1]:
                 center_x = (a[0] + b[0]) / 2
                 center_y = (a[1] + b[1]) / 2
@@ -161,15 +205,17 @@ class Saver(arcade.Window):
                                              color=arcade.color.PINK)
             sprite.set_position(center_x, center_y)
             self.screens_sprites.append(sprite)
-        print(self.corners2)
+        # self.grid.set_visibility(self.screens_sprites)
+        self.grid.grid_list[0].make_active()
+        print(self.grid.grid_list[0].position)
 
     def on_update(self, delta_time):
-        pass
+        self.grid.update()
 
     def on_draw(self):
         arcade.start_render()
-        self.screens_sprites.draw()
-        # self.borders.draw()
+        # self.screens_sprites.draw()
+        self.grid.draw()
 
 
 if __name__ == "__main__":
