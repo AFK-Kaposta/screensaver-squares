@@ -41,39 +41,6 @@ def get_farthest_points(points: list):
     return [(min_x, min_y), (max_x, max_y)]
 
 
-def convert_to_hit_box(lines) -> list:
-    """gets a list of corners and sorts them such as if each neighbour is connected, the shape of all the
-    screens combined would be drawn."""
-
-    # POSSIBLE BUG: if 2 or more corners of the screen exist at the exact same point, the outline of the screens
-    # might be built wrong.
-    def locate(list_of_lines, line):
-        """locates the first occurrence on n in a list of points"""
-        for i in range(len(list_of_lines)):
-            if list_of_lines[i][0] == line[1]:
-                return i, False
-            elif list_of_lines[i][1] == line[1]:
-                return i, True
-        return None, None
-
-    new = [lines[0]]
-    del lines[0]
-    while len(lines) > 0:
-        index, reverse = locate(lines, new[-1])
-        if reverse:
-            lines[index] = (lines[index][1], lines[index][0])
-        if index is None:
-            new = new[1:] + [new[0]]
-        else:
-            new.append(lines[index])
-            del lines[index]
-
-    out = []
-    for point1, point2 in new:
-        out += [point1, point2]
-    return out
-
-
 class Square(arcade.SpriteSolidColor):
     def __init__(self,
                  center_x: int,
@@ -83,17 +50,13 @@ class Square(arcade.SpriteSolidColor):
                  next_color: arcade.Color = arcade.color.DARK_CYAN,
                  lives: int = None,
                  max_lives: int = None,
-                 min_lives: int = None,
-                 *args, **kwargs):
+                 min_lives: int = None):
         """Square has a certain number lives, when a square runs out of lives it becomes active and reduces other
         square's lives."""
-        super().__init__(center_y=center_y,
-                         center_x=center_x,
-                         width=width,
-                         height=width,
-                         color=color,
-                         *args, **kwargs)
+        super().__init__(width=width, height=width, color=color)
 
+        self.center_x = center_x
+        self.center_y = center_y
         self.next_color = next_color
         self.lives = None
         self.set_lives(lives, max_lives, min_lives)
@@ -157,25 +120,6 @@ class Grid:
                 sq.draw()
 
 
-class SpriteScreens(arcade.Sprite):
-    def __init__(self, corners: list, center_x: int, center_y: int, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.corners = corners
-        self.center_x = center_x
-        self.center_y = center_y
-        self.will_draw = False
-
-        self.relative_hit_box = []
-        for point in self.corners:
-            self.relative_hit_box += [[point[0] - center_x, point[1] - center_y]]
-
-        self.set_hit_box(self.relative_hit_box)
-
-    def draw(self):
-        if self.will_draw:
-            self.draw_hit_box(color=arcade.color.PINK, line_thickness=5)
-
-
 class Saver(arcade.Window):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -186,6 +130,7 @@ class Saver(arcade.Window):
         x_diff, y_diff = diff[0][0], diff[1][1]  # the most bottom left corner (where the arcade 0,0 is)
         for i in range(len(self.corners)):
             self.corners[i] = (self.corners[i][0] - x_diff, -self.corners[i][1] + y_diff)
+        self.corners2 = self.corners.copy()
 
         # setting key attributes
         self.view_corners = get_farthest_points(self.corners)
@@ -193,41 +138,37 @@ class Saver(arcade.Window):
         self.ups = 20  # Updates Per Second (basically useless above 60)
         self.set_update_rate(1 / self.ups)
 
-        for i in range(len(self.corners)):  # making it so I can connect each of the neighboring dots to make a
-            # rectangle
-            if i % 4 == 2:
-                self.corners[i], self.corners[i + 1] = self.corners[i + 1], self.corners[i]
-        self.line_list = []  # the borders of the screen
-        for i in range(0, len(self.corners), 2):
-            self.line_list += [(self.corners[i], self.corners[i + 1])]
-            if i % 4 == 0:
-                self.line_list += [(self.corners[i], self.corners[i + 3])] + \
-                                  [(self.corners[i + 1], self.corners[i + 2])]
-        line_combs = itertools.combinations(self.line_list, 2)
-        # self.borders = arcade.SpriteList(is_static=True, use_spatial_hash=True)
-        for line1, line2 in line_combs:
-            if line1[0][0] == line1[1][0] == line2[0][0] == line2[1][0]:
-                out = sorted(line1 + line2, key=lambda x: x[1])
-                self.line_list.remove(line1)
-                self.line_list.remove(line2)
-                self.line_list += ((out[0], out[1]), (out[2], out[3]))
-            elif line1[0][1] == line1[1][1] == line2[0][1] == line2[1][1]:
-                out = sorted(line1 + line2, key=lambda x: x[0])
-                self.line_list.remove(line1)
-                self.line_list.remove(line2)
-                self.line_list += ((out[0], out[1]), (out[2], out[3]))
-
-        self.corners_sorted = convert_to_hit_box(self.line_list)
-        center_x = int((self.view_corners[0][0] + self.view_corners[1][0]) / 2)
-        center_y = int((self.view_corners[0][1] + self.view_corners[1][1]) / 2)
-        self.screens_sprite = SpriteScreens(corners=self.corners_sorted, center_x=center_x, center_y=center_y)
+        self.screens_sprites = arcade.SpriteList(use_spatial_hash=False, is_static=True)
+        for i in range(0, len(self.corners2), 4):
+            a, b, c, d = self.corners2[i], self.corners2[i + 1], self.corners2[i + 2], self.corners2[i + 3]
+            if a[0] != b[0] and a[1] != b[1]:
+                center_x = (a[0] + b[0]) / 2
+                center_y = (a[1] + b[1]) / 2
+                width = abs(a[0] - b[0])
+                height = abs(a[1] - b[1])
+            elif a[0] != c[0] and a[1] != c[1]:
+                center_x = (a[0] + c[0]) / 2
+                center_y = (a[1] + c[1]) / 2
+                width = abs(a[0] - c[0])
+                height = abs(a[1] - c[1])
+            else:
+                center_x = (a[0] + d[0]) / 2
+                center_y = (a[1] + d[1]) / 2
+                width = abs(a[0] - d[0])
+                height = abs(a[1] - d[1])
+            sprite = arcade.SpriteSolidColor(width=width,
+                                             height=height,
+                                             color=arcade.color.PINK)
+            sprite.set_position(center_x, center_y)
+            self.screens_sprites.append(sprite)
+        print(self.corners2)
 
     def on_update(self, delta_time):
         pass
 
     def on_draw(self):
         arcade.start_render()
-        self.screens_sprite.draw()
+        self.screens_sprites.draw()
         # self.borders.draw()
 
 
