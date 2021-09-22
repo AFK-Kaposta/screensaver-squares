@@ -5,6 +5,7 @@ import random
 import math
 import itertools
 import copy
+import PIL.Image
 
 
 def get_corners(screens):
@@ -78,8 +79,9 @@ class Square(arcade.SpriteSolidColor):
 
     def make_active(self):
         self.active = True
-        # self._set_color(self.next_color)
-        self.color = self.next_color
+        self.color = self.next_color  # idk wtf but for the color to change these next two lines need to be here
+        image = PIL.Image.new('RGBA', (self.size, self.size), self.color)
+        self.texture = arcade.Texture(f"Solid-{self.color[0]}-{self.color[1]}-{self.color[2]}", image)
         self.next_color = None
 
     def reduce_life(self) -> None:
@@ -177,7 +179,7 @@ class Saver(arcade.Window):
         self.square_size = 50  # square width and height in pixels.
         self.square_count_x = math.ceil(self.view_width / self.square_size)
         self.square_count_y = math.ceil(self.view_height / self.square_size)
-        self.base_square = Square(center_x=0, center_y=0, size=self.square_size, max_lives=12, min_lives=4)
+        self.base_square = Square(center_x=0, center_y=0, size=self.square_size, max_lives=50, min_lives=1)
         self.grid = Grid(width=self.square_count_x,
                          height=self.square_count_y,
                          infection_range=2,
