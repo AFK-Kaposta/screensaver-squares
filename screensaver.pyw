@@ -75,14 +75,21 @@ class Square(arcade.SpriteSolidColor):
         """reduces lives from the square."""
         if not self.active:
             self.lives -= amount
-            print(f'reduced at index {self.index}, position ({self.center_x}, {self.center_y})')
+            # print(f'reduced at index {self.index}, position ({self.center_x}, {self.center_y})')
 
     def make_active(self):
         self.active = True
-        self.color = self.next_color  # idk wtf but for the color to change these next two lines need to be here
-        image = PIL.Image.new('RGBA', (self.size, self.size), self.color)
-        self.texture = arcade.Texture(f"Solid-{self.color[0]}-{self.color[1]}-{self.color[2]}", image)
+        self.set_color(self.next_color)
         self.next_color = None
+
+    def set_color(self, color: arcade.Color):
+        """for proper setting of the color one must run this function."""  # (that came out poetic)
+        self.color = color  # idk wtf but for the color to change these next two lines need to be here (copied from
+        image = PIL.Image.new('RGBA', (self.size, self.size), self.color)  # SpriteSolidColor.__init__())
+        self.texture = arcade.Texture(f"Solid-{self.color[0]}-{self.color[1]}-{self.color[2]}", image)
+
+    def set_next_color(self, next_color: arcade.Color):
+        self.next_color = next_color
 
     def reduce_life(self) -> None:
         """reduces a life from the square."""
@@ -111,39 +118,50 @@ class Grid:
         self.height = height
         self.fill_sq = sq
         self.infection_range = infection_range
+        self.out_of_passives = False
 
         self.grid_list = arcade.SpriteList()  # use_spatial_hash=False, is_static=True)
         for col in range(self.width):
             for row in range(self.height):
                 clone = copy.copy(sq)
-                clone.index = self.height * col + row
-                clone.set_position(clone.size * (row + 0.5), clone.size * (col + 0.5))
-                print(f'set {col},{row}')
+                clone.index = self.to_index(self.height, col, row)
+                clone.set_position(clone.size * (col + 0.5), clone.size * (row + 0.5))
+                # print(f'set {clone.size * (col + 0.5)},{clone.size * (row + 0.5)}')
                 clone.randomize_lives()
                 self.grid_list.append(clone)
 
     def update(self) -> None:
         """updates all the squares in the grid"""
+        passives_exist = False
         for col in range(self.width):
             for row in range(self.height):
-                if self.grid_list[self.height * col + row].active:
+                if self.grid_list[self.to_index(self.height, col, row)].active:
                     self.reduce_around(col, row)
                 else:
-                    self.grid_list[self.height * col + row].update()
+                    self.grid_list[self.to_index(self.height, col, row)].update()
+                    passives_exist = True
+        self.out_of_passives = False if passives_exist else True
 
     def reduce_around(self, col: int, row: int) -> None:
         """reduces one life in a range around the given position."""
-        min_x, min_y = row - self.infection_range, col - self.infection_range
-        max_x, max_y = row + self.infection_range, col + self.infection_range
+        min_x = col - self.infection_range
+        max_x = col + self.infection_range
+        min_y = row - self.infection_range
+        max_y = row + self.infection_range
 
-        max_x %= self.width  # making sure the index won't be out of bounds
-        max_y %= self.height
+        # max_x %= self.width  # making sure the index won't be out of bounds
+        # max_y %= self.height
+        # min_x = abs(min_x)
+        # min_y = abs(min_y)
 
-        print(f'min: {min_x},{min_y}, max: {max_x},{max_y}')
-        for x in range(min_x, max_x):
-            for y in range(min_y, max_y):
+        print(f'min: ({min_x:2d},{min_y:2d}), max: ({max_x:2d},{max_y:2d})')
+        for x in range(min_x, max_x + 1):
+            for y in range(min_y, max_y + 1):
                 # print(f'row {row}, col {col}')
-                self.grid_list[self.height * x + y].reduce_lives()
+                self.grid_list[self.to_index(self.height, x, y)].reduce_lives(1000)
+
+    def to_index(self, height, col, row):
+        return (height * col + row) % (self.width * self.height)
 
     def draw(self):
         self.grid_list.draw()
@@ -173,17 +191,14 @@ class Saver(arcade.Window):
         self.view_corners = get_farthest_points(self.corners)
         self.view_width = self.view_corners[1][0]
         self.view_height = self.view_corners[1][1]
-        self.screen_color = arcade.color.DARK_ELECTRIC_BLUE
-        self.ups = 3  # Updates Per Second (basically useless above 60)
+        self.background_color = arcade.color.BLUE
+        self.ups = 1  # Updates Per Second (basically useless above 60)
         self.set_update_rate(1 / self.ups)
         self.square_size = 50  # square width and height in pixels.
         self.square_count_x = math.ceil(self.view_width / self.square_size)
         self.square_count_y = math.ceil(self.view_height / self.square_size)
-        self.base_square = Square(center_x=0, center_y=0, size=self.square_size, max_lives=50, min_lives=1)
-        self.grid = Grid(width=self.square_count_x,
-                         height=self.square_count_y,
-                         infection_range=2,
-                         sq=self.base_square)
+        self.base_square = Square(center_x=0, center_y=0, size=self.square_size, max_lives=33, min_lives=1)
+        self.grid = Grid(width=self.square_count_x, height=self.square_count_y, infection_range=2, sq=self.base_square)
         self.screens_sprites = arcade.SpriteList(use_spatial_hash=False, is_static=True)
         for i in range(0, len(self.corners), 4):
             a, b, c, d = self.corners[i], self.corners[i + 1], self.corners[i + 2], self.corners[i + 3]
@@ -202,14 +217,14 @@ class Saver(arcade.Window):
                 center_y = (a[1] + d[1]) / 2
                 width = abs(a[0] - d[0])
                 height = abs(a[1] - d[1])
-            sprite = arcade.SpriteSolidColor(width=width,
+            screen = arcade.SpriteSolidColor(width=width,
                                              height=height,
                                              color=arcade.color.PINK)
-            sprite.set_position(center_x, center_y)
-            self.screens_sprites.append(sprite)
+            screen.set_position(center_x, center_y)
+            self.screens_sprites.append(screen)
         # self.grid.set_visibility(self.screens_sprites)
-        self.grid.grid_list[0].make_active()
-        print(self.grid.grid_list[0].position)
+        self.grid.grid_list[int(len(self.grid.grid_list) * (8 / 10))].make_active()
+        print(self.grid.grid_list[int(len(self.grid.grid_list) * (8 / 10))].position)
 
     def on_update(self, delta_time):
         self.grid.update()
