@@ -7,6 +7,8 @@ import itertools
 import copy
 import PIL.Image
 
+DARK_THEME = True
+
 
 def get_corners(screens):
     """returns a list of coordinates, which are all the corners of the inputted screens"""
@@ -44,7 +46,10 @@ def get_farthest_points(points: list):
 
 
 def random_color() -> arcade.Color:
-    return random.randint(0, 256), random.randint(0, 256), random.randint(0, 256)
+    if DARK_THEME:
+        return random.randint(0, 128), random.randint(0, 128), random.randint(0, 128)
+    else:
+        return random.randint(0, 256), random.randint(0, 256), random.randint(0, 256)
 
 
 class Square(arcade.SpriteSolidColor):
@@ -216,11 +221,11 @@ class Saver(arcade.Window):
         self.background_color = arcade.color.BLUE
         self.ups = 30  # Updates Per Second (basically useless above 60)
         self.set_update_rate(1 / self.ups)
-        self.square_size = 100  # square width and height in pixels.
+        self.square_size = 50  # square width and height in pixels.
         self.square_count_x = math.ceil(self.view_width / self.square_size)
         self.square_count_y = math.ceil(self.view_height / self.square_size)
-        print(f'list length: {self.square_count_x * self.square_count_y}')
-        self.base_square = Square(center_x=0, center_y=0, size=self.square_size, max_lives=600, min_lives=1)
+        # print(f'list length: {self.square_count_x * self.square_count_y}')
+        self.base_square = Square(center_x=0, center_y=0, size=self.square_size, max_lives=3500, min_lives=1)
         self.grid = Grid(width=self.square_count_x, height=self.square_count_y, infection_range=2, sq=self.base_square)
         self.screens_sprites = arcade.SpriteList(use_spatial_hash=False, is_static=True)
         for i in range(0, len(self.corners), 4):

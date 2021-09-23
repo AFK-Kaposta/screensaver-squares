@@ -1,0 +1,2 @@
+install_screensaver screensaver.pyw
+pause
