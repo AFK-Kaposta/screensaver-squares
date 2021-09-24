@@ -6,6 +6,7 @@ import math
 import itertools
 import copy
 import PIL.Image
+import time
 
 DARK_THEME = True
 
@@ -49,7 +50,7 @@ def random_color() -> arcade.Color:
     if DARK_THEME:
         return random.randint(0, 128), random.randint(0, 128), random.randint(0, 128)
     else:
-        return random.randint(0, 256), random.randint(0, 256), random.randint(0, 256)
+        return random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)
 
 
 class Square(arcade.SpriteSolidColor):
@@ -75,10 +76,13 @@ class Square(arcade.SpriteSolidColor):
         self.center_x = center_x
         self.center_y = center_y
         self.next_color = next_color
-        self.lives = lives
         self.max_lives = max_lives
         self.min_lives = min_lives
         self.active = False
+        if lives is None:
+            self.randomize_lives()
+        else:
+            self.lives = lives
 
     def reduce_lives(self, amount: int = 1) -> None:
         """reduces lives from the square."""
@@ -140,13 +144,22 @@ class Grid:
         self.initial_active_index = initial_active_index
         self._len = self.width * self.height
 
-        self.grid_list = arcade.SpriteList()  # use_spatial_hash=False, is_static=True)
+        self.grid_list = arcade.SpriteList(use_spatial_hash=False)  # , is_static=True)
+        initial_color = random_color()
         for col in range(self.width):
             for row in range(self.height):
-                clone = copy.copy(sq)
-                clone.index = self.to_index(self.height, col, row)
-                clone.set_position(clone.size * (col + 0.5), clone.size * (row + 0.5))
-                clone.randomize_lives()
+                # clone = copy.copy(sq)
+                # clone.index = self.to_index(self.height, col, row)
+                # clone.set_position(clone.size * (col + 0.5), clone.size * (row + 0.5))
+                # clone.randomize_lives()
+                clone = Square(center_x=int(sq.size * (col + 0.5)),
+                               center_y=int(sq.size * (row + 0.5)),
+                               size=sq.size,
+                               index=self.to_index(self.height, col, row),
+                               color=initial_color,
+                               next_color=sq.next_color,
+                               max_lives=sq.max_lives,
+                               min_lives=sq.min_lives)
                 self.grid_list.append(clone)
 
     def __len__(self):
@@ -219,14 +232,17 @@ class Saver(arcade.Window):
         self.view_width = self.view_corners[1][0]
         self.view_height = self.view_corners[1][1]
         self.background_color = arcade.color.BLUE
-        self.ups = 30  # Updates Per Second (basically useless above 60)
+        self.ups = 15  # Updates Per Second (basically useless above 60)
         self.set_update_rate(1 / self.ups)
-        self.square_size = 50  # square width and height in pixels.
+        self.square_size = 20  # square width and height in pixels.
         self.square_count_x = math.ceil(self.view_width / self.square_size)
         self.square_count_y = math.ceil(self.view_height / self.square_size)
         # print(f'list length: {self.square_count_x * self.square_count_y}')
-        self.base_square = Square(center_x=0, center_y=0, size=self.square_size, max_lives=3500, min_lives=1)
+        self.base_square = Square(center_x=0, center_y=0, size=self.square_size, max_lives=2000, min_lives=1)
+        start = time.time()
         self.grid = Grid(width=self.square_count_x, height=self.square_count_y, infection_range=2, sq=self.base_square)
+        end = time.time()
+        print(f'time to create the grid: {end - start:.4f} seconds')
         self.screens_sprites = arcade.SpriteList(use_spatial_hash=False, is_static=True)
         for i in range(0, len(self.corners), 4):
             a, b, c, d = self.corners[i], self.corners[i + 1], self.corners[i + 2], self.corners[i + 3]
@@ -260,7 +276,11 @@ class Saver(arcade.Window):
         self.grid.draw()
 
 
-if __name__ == "__main__":
+def main():
     screensaver_framework._get_preferred_screen = comb_screens
     screensaver_framework.create_screensaver_window(Saver)
     arcade.run()
+
+
+if __name__ == "__main__":
+    main()
