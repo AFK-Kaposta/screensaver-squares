@@ -3,12 +3,14 @@ from arcade_screensaver_framework import screensaver_framework
 import pyglet
 import random
 import math
-import itertools
-import copy
 import PIL.Image
 import time
 
 DARK_THEME = True
+LIVES = 2000
+UPDATES_PER_SECOND = 15
+TILE_SIZE = 35  # in pixels
+DEBUG = False
 
 
 def get_corners(screens):
@@ -101,7 +103,8 @@ class Square(arcade.SpriteSolidColor):
         self.active = False
         if lives is None:
             self.randomize_lives()
-        print(f'making index {self.index:5d} passive: lives={self.lives:3d}, active={self.active}')
+        if DEBUG:
+            print(f'making index {self.index:5d} passive: lives={self.lives:3d}, active={self.active}')
 
     def set_color(self, color: arcade.Color):
         """for proper setting of the color one must run this function."""  # (that came out poetic)
@@ -148,10 +151,6 @@ class Grid:
         initial_color = random_color()
         for col in range(self.width):
             for row in range(self.height):
-                # clone = copy.copy(sq)
-                # clone.index = self.to_index(self.height, col, row)
-                # clone.set_position(clone.size * (col + 0.5), clone.size * (row + 0.5))
-                # clone.randomize_lives()
                 clone = Square(center_x=int(sq.size * (col + 0.5)),
                                center_y=int(sq.size * (row + 0.5)),
                                size=sq.size,
@@ -194,10 +193,8 @@ class Grid:
         min_y = row - self.infection_range
         max_y = row + self.infection_range
 
-        # print(f'min: ({min_x:2d},{min_y:2d}), max: ({max_x:2d},{max_y:2d})')
         for x in range(min_x, max_x + 1):
             for y in range(min_y, max_y + 1):
-                # print(f'row {row}, col {col}')
                 self.grid_list[self.to_index(self.height, x, y)].reduce_lives(1)
 
     def to_index(self, height, col, row):
@@ -206,7 +203,7 @@ class Grid:
     def draw(self):
         self.grid_list.draw()
 
-    def set_visibility(self, screens_list: arcade.SpriteList) -> None:
+    def set_visibility(self, screens_list: arcade.SpriteList) -> None:  # unused
         """goes through all the sprites and checks if they will be visible on the given screens list.
         if a sprite won't be visible on the screen his 'visible' attribute will be set to False."""
         visible_sprites = []
@@ -231,18 +228,19 @@ class Saver(arcade.Window):
         self.view_corners = get_farthest_points(self.corners)
         self.view_width = self.view_corners[1][0]
         self.view_height = self.view_corners[1][1]
-        self.background_color = arcade.color.BLUE
-        self.ups = 15  # Updates Per Second (basically useless above 60)
+        self.ups = UPDATES_PER_SECOND  # Updates Per Second (basically useless above 60)
         self.set_update_rate(1 / self.ups)
-        self.square_size = 20  # square width and height in pixels.
+        self.square_size = TILE_SIZE  # square width and height in pixels.
         self.square_count_x = math.ceil(self.view_width / self.square_size)
         self.square_count_y = math.ceil(self.view_height / self.square_size)
-        # print(f'list length: {self.square_count_x * self.square_count_y}')
-        self.base_square = Square(center_x=0, center_y=0, size=self.square_size, max_lives=2000, min_lives=1)
-        start = time.time()
+        self.base_square = Square(center_x=0, center_y=0, size=self.square_size, max_lives=LIVES, min_lives=1)
+        if DEBUG:
+            print(f'amount of squares: {self.square_count_x * self.square_count_y}')
+            start = time.time()
         self.grid = Grid(width=self.square_count_x, height=self.square_count_y, infection_range=2, sq=self.base_square)
-        end = time.time()
-        print(f'time to create the grid: {end - start:.4f} seconds')
+        if DEBUG:
+            end = time.time()
+            print(f'time to create the grid: {end - start:.4f} seconds')
         self.screens_sprites = arcade.SpriteList(use_spatial_hash=False, is_static=True)
         for i in range(0, len(self.corners), 4):
             a, b, c, d = self.corners[i], self.corners[i + 1], self.corners[i + 2], self.corners[i + 3]
@@ -264,15 +262,13 @@ class Saver(arcade.Window):
             screen = arcade.SpriteSolidColor(width=width, height=height, color=arcade.color.PINK)
             screen.set_position(center_x, center_y)
             self.screens_sprites.append(screen)
-        self.grid.grid_list[0].make_active()
-        # print(self.grid.grid_list[int(len(self.grid.grid_list) * (8 / 10))].position)
+        self.grid.grid_list[random.randint(0, len(self.grid))].make_active()
 
     def on_update(self, delta_time):
         self.grid.update()
 
     def on_draw(self):
         arcade.start_render()
-        # self.screens_sprites.draw()
         self.grid.draw()
 
 
