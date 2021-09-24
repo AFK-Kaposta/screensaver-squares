@@ -7,7 +7,7 @@ import PIL.Image
 import time
 
 DARK_THEME = True
-LIVES = 2000
+COLOR_CHANGE_RATE = 2000
 UPDATES_PER_SECOND = 15
 TILE_SIZE = 35  # in pixels
 DEBUG = False
@@ -233,7 +233,8 @@ class Saver(arcade.Window):
         self.square_size = TILE_SIZE  # square width and height in pixels.
         self.square_count_x = math.ceil(self.view_width / self.square_size)
         self.square_count_y = math.ceil(self.view_height / self.square_size)
-        self.base_square = Square(center_x=0, center_y=0, size=self.square_size, max_lives=LIVES, min_lives=1)
+        self.base_square = Square(center_x=0, center_y=0, size=self.square_size, max_lives=COLOR_CHANGE_RATE,
+                                  min_lives=1)
         if DEBUG:
             print(f'amount of squares: {self.square_count_x * self.square_count_y}')
             start = time.time()
