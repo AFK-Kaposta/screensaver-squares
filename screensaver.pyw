@@ -10,7 +10,7 @@ DARK_THEME = True
 COLOR_CHANGE_RATE = 2000
 UPDATES_PER_SECOND = 15
 TILE_SIZE = 35  # in pixels
-DEBUG = False
+DEBUG = True
 
 
 def get_corners(screens):
@@ -154,7 +154,7 @@ class Grid:
                 clone = Square(center_x=int(sq.size * (col + 0.5)),
                                center_y=int(sq.size * (row + 0.5)),
                                size=sq.size,
-                               index=self.to_index(self.height, col, row),
+                               index=self.to_index(col, row),
                                color=initial_color,
                                next_color=sq.next_color,
                                max_lives=sq.max_lives,
@@ -169,7 +169,7 @@ class Grid:
         passives_exist = False
         for col in range(self.width):
             for row in range(self.height):
-                current: Square = self.grid_list[self.to_index(self.height, col, row)]
+                current: Square = self.grid_list[self.to_index(col, row)]
                 if self.out_of_passives:
                     current.make_passive(self.random_next_color)
                     if current.index == self.initial_active_index:
@@ -195,10 +195,10 @@ class Grid:
 
         for x in range(min_x, max_x + 1):
             for y in range(min_y, max_y + 1):
-                self.grid_list[self.to_index(self.height, x, y)].reduce_lives(1)
+                self.grid_list[self.to_index(x, y)].reduce_lives(1)
 
-    def to_index(self, height, col, row):
-        return (height * col + row) % len(self)
+    def to_index(self, col, row):
+        return self.height * (col % self.width) + (row % self.height)
 
     def draw(self):
         self.grid_list.draw()
