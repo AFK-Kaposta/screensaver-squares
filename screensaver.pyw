@@ -7,10 +7,10 @@ import PIL.Image
 import time
 
 DARK_THEME = True
-COLOR_CHANGE_RATE = 2000
+COLOR_CHANGE_RATE = 3000
 UPDATES_PER_SECOND = 15
 TILE_SIZE = 35  # in pixels
-DEBUG = True
+DEBUG = False
 
 
 def get_corners(screens):
