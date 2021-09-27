@@ -12,8 +12,9 @@ this screensaver supports any amount and arrangement of
 monitors.
 
 ### Installation:
-To install the screensaver, copy the `Squares.scr` file to this folder: `C:\Windows\System32`. After that, select 
-'Squares' in the Windows control panel > Search: 'screen saver' > click on 'Change screen saver'.
+To install the screensaver, right-click the file `Squares.scr`, and click on `Install`. If that doesn't work for 
+some reason, copy the `Squares.scr` file to this folder: `C:\Windows\System32`. After that, select 'Squares' in the 
+Windows control panel > Search: 'screen saver' > click on 'Change screen saver'.
 
 ### Software Used:
 _(This software is not required in order to run `Squares.scr`.)_
