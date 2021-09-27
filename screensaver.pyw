@@ -122,7 +122,12 @@ class Square(arcade.SpriteSolidColor):
     def set_lives(self, exact_amount: int = None, max_lives: int = None, min_lives: int = None) -> None:
         """sets a random amount of lives based on the given range, or an exact amount."""
         if exact_amount is None:
-            self.lives = random.randint(min_lives, max_lives)
+            low_num = 'low'
+            choice = random.choice([low_num] + [""] * 12)
+            if choice is low_num:
+                self.lives = random.randint(min_lives, int((max_lives + 49 * min_lives) / (50 * min_lives)))
+            else:
+                self.lives = random.randint(min_lives, max_lives)
         else:
             self.lives = exact_amount
 
@@ -235,13 +240,7 @@ class Saver(arcade.Window):
         self.square_count_y = math.ceil(self.view_height / self.square_size)
         self.base_square = Square(center_x=0, center_y=0, size=self.square_size, max_lives=COLOR_CHANGE_RATE,
                                   min_lives=1)
-        if DEBUG:
-            print(f'amount of squares: {self.square_count_x * self.square_count_y}')
-            start = time.time()
         self.grid = Grid(width=self.square_count_x, height=self.square_count_y, infection_range=2, sq=self.base_square)
-        if DEBUG:
-            end = time.time()
-            print(f'time to create the grid: {end - start:.4f} seconds')
         self.screens_sprites = arcade.SpriteList(use_spatial_hash=False, is_static=True)
         for i in range(0, len(self.corners), 4):
             a, b, c, d = self.corners[i], self.corners[i + 1], self.corners[i + 2], self.corners[i + 3]
@@ -264,6 +263,8 @@ class Saver(arcade.Window):
             screen.set_position(center_x, center_y)
             self.screens_sprites.append(screen)
         self.grid.grid_list[random.randint(0, len(self.grid))].make_active()
+        if DEBUG:
+            print(f'amount of squares: {self.square_count_x * self.square_count_y}')
 
     def on_update(self, delta_time):
         self.grid.update()
@@ -274,8 +275,13 @@ class Saver(arcade.Window):
 
 
 def main():
+    if DEBUG:
+        start = time.time()
     screensaver_framework._get_preferred_screen = comb_screens
     screensaver_framework.create_screensaver_window(Saver)
+    if DEBUG:
+        end = time.time()
+        print(f'time to initialize: {end - start:.4f} seconds')
     arcade.run()
 
 
