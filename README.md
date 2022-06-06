@@ -1,5 +1,5 @@
 # Screen saver - Squares
-_By AFK_Kaposta_
+
 
 ### Description:
 A screen saver that consists of a grid of squares. 
